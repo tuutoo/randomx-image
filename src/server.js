@@ -59,6 +59,49 @@ function pickFit(fit) {
   return normalized;
 }
 
+function parseTransforms(transformsParam) {
+  if (!transformsParam) return null;
+
+  try {
+    const transforms = typeof transformsParam === 'string'
+      ? JSON.parse(transformsParam)
+      : transformsParam;
+
+    if (!Array.isArray(transforms)) {
+      throw new Error("transforms must be an array");
+    }
+
+    return transforms;
+  } catch (error) {
+    throw new Error(`Invalid transforms parameter: ${error.message}`);
+  }
+}
+
+function applyTransforms(pipeline, transforms) {
+  if (!transforms || transforms.length === 0) return pipeline;
+
+  for (const transform of transforms) {
+    if (!Array.isArray(transform) || transform.length === 0) {
+      throw new Error("Each transform must be a non-empty array [method, ...args]");
+    }
+
+    const [method, ...args] = transform;
+
+    if (typeof method !== 'string') {
+      throw new Error("Transform method name must be a string");
+    }
+
+    if (typeof pipeline[method] !== 'function') {
+      throw new Error(`Invalid Sharp method: ${method}`);
+    }
+
+    // Apply the transformation
+    pipeline = pipeline[method](...args);
+  }
+
+  return pipeline;
+}
+
 function collectImages(root) {
   if (!fs.existsSync(root)) {
     return [];
@@ -103,6 +146,7 @@ app.get("/random-image", async (req, res) => {
     const withoutEnlargement = isTrue(req.query.withoutEnlargement);
     const fit = pickFit(req.query.fit);
     const outputFormat = req.query.format ? pickOutputFormat(req.query.format, req.headers.accept || "") : null;
+    const transforms = parseTransforms(req.query.transforms);
 
     const images = collectImages(imageDir);
     if (images.length === 0) {
@@ -114,7 +158,7 @@ app.get("/random-image", async (req, res) => {
     const file = randomItem(images);
 
     // If no transformation parameters are provided, return the original image
-    if (width === undefined && height === undefined && !outputFormat && quality === undefined) {
+    if (width === undefined && height === undefined && !outputFormat && quality === undefined && !transforms) {
       const imageBuffer = fs.readFileSync(file);
       const mimeType = mime.lookup(path.extname(file)) || "application/octet-stream";
 
@@ -124,7 +168,13 @@ app.get("/random-image", async (req, res) => {
     }
 
     // Process image with sharp if any transformation is requested
-    let pipeline = sharp(file, { failOn: "none" }).rotate();
+    let pipeline = sharp(file, { failOn: "none" });
+
+    // Auto-orient based on EXIF data if no custom rotate transform is provided
+    const hasRotateTransform = transforms && transforms.some(t => t[0] === 'rotate');
+    if (!hasRotateTransform) {
+      pipeline = pipeline.rotate();
+    }
 
     // Only resize if width or height is specified
     if (width !== undefined || height !== undefined) {
@@ -134,6 +184,11 @@ app.get("/random-image", async (req, res) => {
         fit,
         withoutEnlargement
       });
+    }
+
+    // Apply custom transforms if provided
+    if (transforms) {
+      pipeline = applyTransforms(pipeline, transforms);
     }
 
     // Apply output format if specified
