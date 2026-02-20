@@ -1,6 +1,6 @@
 # randomx-image
 
-**[中文](README.zh-CN.md) | English**
+**English | [中文](README.zh-CN.md)**
 
 [![Docker Hub](https://img.shields.io/docker/pulls/tuutoo/randomx-image.svg)](https://hub.docker.com/r/tuutoo/randomx-image)
 [![Docker Image Size](https://img.shields.io/docker/image-size/tuutoo/randomx-image/latest)](https://hub.docker.com/r/tuutoo/randomx-image)
