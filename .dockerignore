@@ -3,3 +3,21 @@ npm-debug.log*
 .yarn
 .env
 .DS_Store
+
+# 测试相关
+test-images/
+test-images-empty/
+coverage/
+
+# Git
+.git
+.gitignore
+
+# 文档和配置
+*.md
+.vscode/
+.editorconfig
+
+# 测试文件
+*.test.js
+vitest.config.js
