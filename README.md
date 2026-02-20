@@ -1,193 +1,224 @@
 # randomx-image
 
-轻量级随机图片 API，基于 Node.js + Sharp + Docker。
+**[中文](README.zh-CN.md) | English**
 
-## 特性
+[![Docker Hub](https://img.shields.io/docker/pulls/tuutoo/randomx-image.svg)](https://hub.docker.com/r/tuutoo/randomx-image)
+[![Docker Image Size](https://img.shields.io/docker/image-size/tuutoo/randomx-image/latest)](https://hub.docker.com/r/tuutoo/randomx-image)
+[![GitHub](https://img.shields.io/github/license/tuutoo/randomx-image)](https://github.com/tuutoo/randomx-image)
 
-- 从挂载目录随机选择图片
-- 支持动态缩放和裁剪参数
-- 支持输出格式：`auto`、`jpg`、`png`、`webp`、`tiff`、`avif`（`auto` 会优先尝试 `avif/webp`）
-- 支持参数：`width`、`height`、`quality`、`withoutEnlargement`、`format`、`fit`
-- **支持完整 Sharp API 调用**：通过 `transforms` 参数实现复杂图像转换
-- 通过 Docker volume 挂载图片，便于维护和替换
+A lightweight random image API service built with Node.js, Sharp, and Docker.
 
-## 目录结构
+## ✨ Features
 
-- `src/server.js` API 服务
-- `images/` 本地图片目录（会挂载到容器 `/app/images`）
-- `Dockerfile`
-- `docker-compose.yml`
+- 🎲 Randomly serve images from a mounted directory
+- 📐 Dynamic image resizing and cropping
+- 🎨 Multiple output formats: `auto`, `jpg`, `png`, `webp`, `tiff`, `avif`
+- ⚙️ Flexible parameters: `width`, `height`, `quality`, `withoutEnlargement`, `format`, `fit`
+- 🚀 **Full Sharp API Access**: Complex image transformations via `transforms` parameter
+- 🐳 Easy maintenance with Docker volume mounting
+- ✅ Comprehensive test suite with 40+ test cases
 
-## 启动
+## 📦 Quick Start
 
-### 1) 准备图片
-
-把图片放到 `./images`（可包含子目录）。
-
-### 2) 使用 Docker Compose 启动
+### Using Docker Hub (Recommended)
 
 ```bash
-docker compose up -d --build
+# Pull the latest image
+docker pull tuutoo/randomx-image
+
+# Run with local image directory
+docker run -d -p 3000:3000 -v ./images:/app/images:ro tuutoo/randomx-image
 ```
 
-服务默认运行在 `http://localhost:3000`。
+Visit `http://localhost:3000/random-image` to get a random image.
 
-## 测试
+### Using Docker Compose
 
-本项目包含完整的测试套件，覆盖所有 API 参数和功能。
+1. **Prepare your images**
+   Place images in the `./images` directory (subdirectories supported).
 
-### 安装测试依赖
+2. **Start the service**
+
+   ```bash
+   docker compose up -d --build
+   ```
+
+The service will be available at `http://localhost:3000`.
+
+### Local Development
 
 ```bash
+# Install dependencies
 npm install
-```
 
-### 运行测试
+# Start development server
+npm run dev
 
-```bash
-# 运行所有测试
+# Run tests
 npm test
-
-# 监视模式（开发时使用）
-npm run test:watch
-
-# 生成覆盖率报告
-npm run test:coverage
 ```
 
-### 测试覆盖范围
+## 📚 API Reference
 
-测试套件包含以下测试用例：
-
-- ✅ **健康检查**：验证 `/health` 端点
-- ✅ **基础功能**：原图返回、无图片处理
-- ✅ **宽度和高度参数**：单独和组合使用，参数验证
-- ✅ **质量参数**：有效值范围（1-100）验证
-- ✅ **格式参数**：支持的格式（jpg、png、webp、avif、tiff、auto）
-- ✅ **Fit 参数**：cover、contain、inside、outside 模式
-- ✅ **WithoutEnlargement 参数**：true/false/1 值处理
-- ✅ **Transforms 参数**：Sharp API 调用（rotate、blur、grayscale、negate 等）
-- ✅ **组合参数**：多个参数同时使用
-- ✅ **响应头**：Content-Type、Cache-Control 验证
-- ✅ **错误处理**：无效参数、边界值测试
-
-测试文件位置：`src/server.test.js`
-
-## API
-
-### 健康检查
+### Health Check
 
 ```http
 GET /health
 ```
 
-### 随机图片
+Returns service status and image directory information.
+
+### Random Image
 
 ```http
 GET /random-image
 ```
 
-查询参数（全部可选）：
+**Query Parameters** (all optional):
 
-- `width`: 宽度（像素，正整数，可选）
-- `height`: 高度（像素，正整数，可选）
-- `quality`: 质量（1-100，可选）
-- `withoutEnlargement`: 是否禁止放大（`true` 或 `1`，可选）
-- `format`: `auto`/`jpg`/`png`/`webp`/`tiff`/`avif`（可选，指定时会进行格式转换）
-- `fit`: `cover`（默认）/`contain`/`inside`/`outside`（控制图像缩放和裁剪方式）
-- `transforms`: JSON 数组，支持完整 Sharp API 调用（可选）
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `width` | integer | Target width in pixels |
+| `height` | integer | Target height in pixels |
+| `quality` | integer | Output quality (1-100) |
+| `withoutEnlargement` | boolean | Prevent image upscaling (`true` or `1`) |
+| `format` | string | Output format: `auto`, `jpg`, `png`, `webp`, `tiff`, `avif` |
+| `fit` | string | Resize strategy: `cover`, `contain`, `inside`, `outside` (default: `cover`) |
+| `transforms` | JSON array | Advanced Sharp API transformations |
 
-**注意**：
-- 不带任何参数时，直接返回原图（保持原始格式和质量）
-- 提供任一转换参数时，会使用 Sharp 处理图片
+**Note**:
+- Without parameters, returns the original image (preserves format and quality)
+- When any transformation parameter is provided, Sharp processes the image
 
-#### 关于图像裁剪和缩放
+### Image Cropping and Scaling
 
-当同时提供 `width` 和 `height` 参数时，图像的处理方式由 `fit` 参数决定：
+When both `width` and `height` are specified, the image processing behavior is controlled by the `fit` parameter:
 
-- **`cover`（默认）**：图像会被缩放和裁剪以完全填充指定的尺寸
-  - 图像将被调整大小以覆盖整个目标区域
-  - 超出的部分会被裁剪，裁剪点默认为图像中心
-  - 适合生成固定尺寸的缩略图
+- **`cover` (default)**: Image is scaled and cropped to fill the specified dimensions
+  - Resizes to cover the entire target area
+  - Excess parts are cropped from the center
+  - Ideal for fixed-size thumbnails
 
-- **`contain`**：图像会被缩放以完整显示在指定尺寸内
-  - 保持原始纵横比
-  - 不会裁剪图像
-  - 可能会在边缘留白
+- **`contain`**: Image is scaled to fit entirely within specified dimensions
+  - Maintains aspect ratio
+  - No cropping
+  - May have whitespace on edges
 
-- **`inside`**：与 `contain` 类似，但只在必要时缩小图像
-  - 如果原图小于指定尺寸，则保持原尺寸
+- **`inside`**: Similar to `contain`, but only shrinks if necessary
+  - Preserves original size if smaller than target
 
-- **`outside`**：确保图像至少达到指定的尺寸
-  - 保持纵横比
-  - 可能会超出指定尺寸
+- **`outside`**: Ensures image meets minimum dimensions
+  - Maintains aspect ratio
+  - May exceed specified dimensions
 
-**示例**：
+**Examples**:
 ```http
-# 裁剪为 800x600，使用 cover 模式（默认）
+# Crop to 800x600 with cover mode (default)
 GET /random-image?width=800&height=600
 
-# 完整显示，不裁剪
+# Fit completely without cropping
 GET /random-image?width=800&height=600&fit=contain
 ```
 
-### Sharp API Transforms
+## 🎨 Sharp API Transforms
 
-`transforms` 参数允许完整访问 Sharp API，实现复杂的图像转换。格式为 JSON 数组，每个元素是 `[方法名, 参数...]`。
+The `transforms` parameter provides full access to Sharp's powerful API for complex image transformations.
+Format: JSON array where each element is `[methodName, ...args]`.
 
-**Sharp API 调用示例**：
+**Sharp API Mapping Examples**:
 
-| Sharp API 调用 | transforms 等效参数 |
-|---------------|-------------------|
+| Sharp API Code | Equivalent `transforms` Parameter |
+|---------------|----------------------------------|
 | `.rotate(90)` | `[["rotate", 90]]` |
 | `.rotate(90).blur(10).tint(255, 0, 255)` | `[["rotate", 90], ["blur", 10], ["tint", 255, 0, 255]]` |
 | `.negate({alpha: false})` | `[["negate", {"alpha": false}]]` |
 | `.grayscale().sharpen()` | `[["grayscale"], ["sharpen"]]` |
 
-## 示例
-
-### 基础使用
+**URL Examples**:
 
 ```http
-# 直接返回原图
-GET /random-image
-```
-
-```http
-# 指定宽高和格式
-GET /random-image?width=800&height=450&quality=82&format=webp&fit=cover
-```
-
-```http
-# 只指定宽度
-GET /random-image?width=600&withoutEnlargement=true&format=auto&fit=inside
-```
-
-### 使用 Sharp API Transforms
-
-```http
-# 旋转 90 度
+# Rotate 90 degrees
 GET /random-image?transforms=[["rotate",90]]
-```
 
-```http
-# 旋转、模糊、着色
+# Rotate, blur, and tint
 GET /random-image?transforms=[["rotate",90],["blur",10],["tint",255,0,255]]
-```
 
-```http
-# 灰度化并锐化
+# Grayscale and sharpen
 GET /random-image?transforms=[["grayscale"],["sharpen"]]
-```
 
-```http
-# 负片效果
+# Negative effect
 GET /random-image?transforms=[["negate",{"alpha":false}]]
-```
 
-```http
-# 组合基础参数和 transforms
+# Combine with basic parameters
 GET /random-image?width=800&height=600&transforms=[["rotate",45],["blur",5]]&format=webp
 ```
 
-更多 Sharp API 方法请参考：[Sharp Documentation](https://sharp.pixelplumbing.com/api-operation)
+For more Sharp API methods, see [Sharp Documentation](https://sharp.pixelplumbing.com/api-operation).
+
+## 🧪 Testing
+
+The project includes a comprehensive test suite covering all API parameters and functionality.
+
+```bash
+# Run all tests
+npm test
+
+# Watch mode (for development)
+npm run test:watch
+
+# Generate coverage report
+npm run test:coverage
+```
+
+For detailed testing information, see [TESTING.md](TESTING.md).
+
+## ⚙️ Configuration
+
+### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PORT` | `3000` | Server port |
+| `IMAGE_DIR` | `./images` | Image directory path |
+
+### Docker Volume Mounting
+
+Mount your local image directory to `/app/images` in the container:
+
+```bash
+docker run -d -p 3000:3000 -v /path/to/your/images:/app/images:ro tuutoo/randomx-image
+```
+
+## 📁 Project Structure
+
+```
+randomx-image/
+├── src/
+│   ├── server.js         # Main API service
+│   └── server.test.js    # Test suite
+├── images/               # Local image directory (mount to container)
+├── Dockerfile            # Docker image configuration
+├── docker-compose.yml    # Docker Compose configuration
+├── package.json
+├── TESTING.md           # Detailed testing guide
+└── README.md
+```
+
+## 🛠️ Technology Stack
+
+- **Node.js** - JavaScript runtime
+- **Express** - Web framework
+- **Sharp** - High-performance image processing
+- **Docker** - Containerization
+- **Vitest** - Testing framework
+- **Supertest** - API testing
+
+## 📝 License
+
+MIT
+
+## 🔗 Links
+
+- [GitHub Repository](https://github.com/tuutoo/randomx-image)
+- [Docker Hub](https://hub.docker.com/r/tuutoo/randomx-image)
+- [Sharp Documentation](https://sharp.pixelplumbing.com)
