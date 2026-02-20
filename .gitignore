@@ -2,3 +2,11 @@ node_modules
 npm-debug.log*
 .env
 images/
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Test images
+test-images/
+test-images-empty/

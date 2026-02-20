@@ -32,6 +32,47 @@ docker compose up -d --build
 
 服务默认运行在 `http://localhost:3000`。
 
+## 测试
+
+本项目包含完整的测试套件，覆盖所有 API 参数和功能。
+
+### 安装测试依赖
+
+```bash
+npm install
+```
+
+### 运行测试
+
+```bash
+# 运行所有测试
+npm test
+
+# 监视模式（开发时使用）
+npm run test:watch
+
+# 生成覆盖率报告
+npm run test:coverage
+```
+
+### 测试覆盖范围
+
+测试套件包含以下测试用例：
+
+- ✅ **健康检查**：验证 `/health` 端点
+- ✅ **基础功能**：原图返回、无图片处理
+- ✅ **宽度和高度参数**：单独和组合使用，参数验证
+- ✅ **质量参数**：有效值范围（1-100）验证
+- ✅ **格式参数**：支持的格式（jpg、png、webp、avif、tiff、auto）
+- ✅ **Fit 参数**：cover、contain、inside、outside 模式
+- ✅ **WithoutEnlargement 参数**：true/false/1 值处理
+- ✅ **Transforms 参数**：Sharp API 调用（rotate、blur、grayscale、negate 等）
+- ✅ **组合参数**：多个参数同时使用
+- ✅ **响应头**：Content-Type、Cache-Control 验证
+- ✅ **错误处理**：无效参数、边界值测试
+
+测试文件位置：`src/server.test.js`
+
 ## API
 
 ### 健康检查

@@ -6,7 +6,11 @@ import mime from "mime-types";
 
 const app = express();
 const port = Number(process.env.PORT || 3000);
-const imageDir = process.env.IMAGE_DIR || path.join(process.cwd(), "images");
+
+// Function to get current image directory (allows runtime changes for testing)
+function getImageDir() {
+  return process.env.IMAGE_DIR || path.join(process.cwd(), "images");
+}
 
 const INPUT_EXTENSIONS = new Set([".jpg", ".jpeg", ".png", ".webp", ".tif", ".tiff", ".avif", ".gif", ".heic", ".heif"]);
 const OUTPUT_FORMATS = new Set(["auto", "jpg", "jpeg", "png", "webp", "tiff", "avif"]);
@@ -135,7 +139,7 @@ function randomItem(list) {
 }
 
 app.get("/health", (_req, res) => {
-  res.json({ ok: true, imageDir });
+  res.json({ ok: true, imageDir: getImageDir() });
 });
 
 app.get("/random-image", async (req, res) => {
@@ -148,10 +152,10 @@ app.get("/random-image", async (req, res) => {
     const outputFormat = req.query.format ? pickOutputFormat(req.query.format, req.headers.accept || "") : null;
     const transforms = parseTransforms(req.query.transforms);
 
-    const images = collectImages(imageDir);
+    const images = collectImages(getImageDir());
     if (images.length === 0) {
       return res.status(404).json({
-        error: `No images found in IMAGE_DIR: ${imageDir}`
+        error: `No images found in IMAGE_DIR: ${getImageDir()}`
       });
     }
 
@@ -216,7 +220,17 @@ app.get("/random-image", async (req, res) => {
   }
 });
 
-app.listen(port, () => {
-  console.log(`randomx-image listening on port ${port}`);
-  console.log(`using image dir: ${imageDir}`);
-});
+// Only start server if this file is run directly (not imported for testing)
+const isMainModule = process.argv[1] && (
+  process.argv[1].endsWith('server.js') ||
+  process.argv[1].endsWith('server.mjs')
+);
+
+if (isMainModule) {
+  app.listen(port, () => {
+    console.log(`randomx-image listening on port ${port}`);
+    console.log(`using image dir: ${getImageDir()}`);
+  });
+}
+
+export default app;
