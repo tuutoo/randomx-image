@@ -1,0 +1,12 @@
+services:
+  randomx-image:
+    build: .
+    container_name: randomx-image
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - IMAGE_DIR=/app/images
+    volumes:
+      - ./images:/app/images:ro
+    restart: unless-stopped
