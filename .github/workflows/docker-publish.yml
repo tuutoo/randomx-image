@@ -1,0 +1,65 @@
+name: Publish Docker image
+
+on:
+  push:
+    branches:
+      - main        # push 到 main 时触发（更新 latest）
+    tags:
+      - 'v*'        # push tag v1.0.0 这种时触发（更新 latest + v1.0.0）
+  workflow_dispatch:  # 手动触发
+
+jobs:
+  # Job 1: push 到 main 分支时，只构建 latest
+  build-latest-on-main:
+    if: startsWith(github.ref, 'refs/heads/')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push latest image (main branch)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: |
+            tuutoo/randomx-image:latest
+
+  # Job 2: push tag 时，同时构建 latest + 版本 tag
+  build-version-on-tag:
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push versioned image (tag)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: |
+            tuutoo/randomx-image:latest
+            tuutoo/randomx-image:${{ github.ref_name }}
