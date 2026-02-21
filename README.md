@@ -11,12 +11,13 @@ A lightweight random image API service built with Node.js, Sharp, and Docker.
 ## ✨ Features
 
 - 🎲 Randomly serve images from a mounted directory
+- � Upload and transform images on-the-fly
 - 📐 Dynamic image resizing and cropping
 - 🎨 Multiple output formats: `auto`, `jpg`, `png`, `webp`, `tiff`, `avif`
 - ⚙️ Flexible parameters: `width`, `height`, `quality`, `withoutEnlargement`, `format`, `fit`
 - 🚀 **Full Sharp API Access**: Complex image transformations via `transforms` parameter
 - 🐳 Easy maintenance with Docker volume mounting
-- ✅ Comprehensive test suite with 40+ test cases
+- ✅ Comprehensive test suite with 50+ test cases
 
 ## 📦 Quick Start
 
@@ -119,6 +120,50 @@ GET /random-image?width=800&height=600
 # Fit completely without cropping
 GET /random-image?width=800&height=600&fit=contain
 ```
+
+### Transform Image
+
+```http
+POST /transform-image
+```
+
+Upload and transform an image with the same parameters as `/random-image`.
+
+**Request Format**: `multipart/form-data`
+
+**Form Field**: `image` (required) - The image file to upload
+
+**Query Parameters**: Same as `/random-image` endpoint (all optional)
+
+**Supported Image Formats**:
+- Input: `.jpg`, `.jpeg`, `.png`, `.webp`, `.tif`, `.tiff`, `.avif`, `.gif`, `.heic`, `.heif`
+- Output: `jpg`, `png`, `webp`, `tiff`, `avif` (controlled by `format` parameter)
+
+**File Size Limit**: 50MB
+
+**Examples**:
+
+```bash
+# Upload and return original image
+curl -X POST -F "image=@photo.jpg" http://localhost:3000/transform-image
+
+# Resize uploaded image
+curl -X POST -F "image=@photo.jpg" "http://localhost:3000/transform-image?width=800&height=600"
+
+# Convert format and apply quality
+curl -X POST -F "image=@photo.png" "http://localhost:3000/transform-image?format=webp&quality=85"
+
+# Apply transforms: grayscale and blur
+curl -X POST -F "image=@photo.jpg" "http://localhost:3000/transform-image?transforms=[[\"grayscale\"],[\"blur\",5]]"
+
+# Combine all parameters
+curl -X POST -F "image=@photo.jpg" \
+  "http://localhost:3000/transform-image?width=500&format=jpg&quality=90&transforms=[[\"sharpen\"]]"
+```
+
+**Response**:
+- Success: Returns the processed image with appropriate `Content-Type` header
+- Error: Returns JSON with error message (HTTP 400)
 
 ## 🎨 Sharp API Transforms
 

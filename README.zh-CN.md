@@ -11,12 +11,13 @@
 ## ✨ 特性
 
 - 🎲 从挂载目录随机返回图片
+- � 上传并即时转换图片
 - 📐 动态图像缩放和裁剪
 - 🎨 多种输出格式：`auto`、`jpg`、`png`、`webp`、`tiff`、`avif`
 - ⚙️ 灵活的参数配置：`width`、`height`、`quality`、`withoutEnlargement`、`format`、`fit`
 - 🚀 **完整的 Sharp API 支持**：通过 `transforms` 参数实现复杂图像转换
 - 🐳 通过 Docker 卷挂载轻松维护图片
-- ✅ 包含 40+ 测试用例的完整测试套件
+- ✅ 包含 50+ 测试用例的完整测试套件
 
 ## 📦 快速开始
 
@@ -119,6 +120,50 @@ GET /random-image?width=800&height=600
 # 完整显示，不裁剪
 GET /random-image?width=800&height=600&fit=contain
 ```
+
+### 图片转换
+
+```http
+POST /transform-image
+```
+
+上传并转换图片，参数与 `/random-image` 相同。
+
+**请求格式**：`multipart/form-data`
+
+**表单字段**：`image`（必需）- 要上传的图片文件
+
+**查询参数**：与 `/random-image` 端点相同（全部可选）
+
+**支持的图片格式**：
+- 输入：`.jpg`、`.jpeg`、`.png`、`.webp`、`.tif`、`.tiff`、`.avif`、`.gif`、`.heic`、`.heif`
+- 输出：`jpg`、`png`、`webp`、`tiff`、`avif`（由 `format` 参数控制）
+
+**文件大小限制**：50MB
+
+**示例**：
+
+```bash
+# 上传并返回原图
+curl -X POST -F "image=@photo.jpg" http://localhost:3000/transform-image
+
+# 调整上传图片的大小
+curl -X POST -F "image=@photo.jpg" "http://localhost:3000/transform-image?width=800&height=600"
+
+# 转换格式并设置质量
+curl -X POST -F "image=@photo.png" "http://localhost:3000/transform-image?format=webp&quality=85"
+
+# 应用转换：灰度化和模糊
+curl -X POST -F "image=@photo.jpg" "http://localhost:3000/transform-image?transforms=[[\"grayscale\"],[\"blur\",5]]"
+
+# 组合所有参数
+curl -X POST -F "image=@photo.jpg" \
+  "http://localhost:3000/transform-image?width=500&format=jpg&quality=90&transforms=[[\"sharpen\"]]"
+```
+
+**响应**：
+- 成功：返回处理后的图片，包含相应的 `Content-Type` 头
+- 错误：返回 JSON 格式的错误信息（HTTP 400）
 
 ## 🎨 Sharp API Transforms
 

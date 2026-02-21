@@ -452,3 +452,169 @@ describe('Random Image API', () => {
     });
   });
 });
+
+describe('POST /transform-image - File upload processing', () => {
+
+  describe('Basic file upload', () => {
+
+    it('should return 400 when no file is uploaded', async () => {
+      const response = await request(app)
+        .post('/transform-image');
+
+      expect(response.status).toBe(400);
+      expect(response.body).toHaveProperty('error');
+      expect(response.body.error).toContain('No image file uploaded');
+    });
+
+    it('should return original image without parameters', async () => {
+      const testImagePath = path.join(testImageDir, 'test.png');
+      const response = await request(app)
+        .post('/transform-image')
+        .attach('image', testImagePath);
+
+      expect(response.status).toBe(200);
+      expect(response.headers['content-type']).toMatch(/^image\//);
+      expect(response.headers['cache-control']).toBe('no-store');
+      expect(response.body).toBeInstanceOf(Buffer);
+      expect(response.body.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('Image transformations', () => {
+
+    it('should resize uploaded image with width', async () => {
+      const testImagePath = path.join(testImageDir, 'test.png');
+      const response = await request(app)
+        .post('/transform-image')
+        .attach('image', testImagePath)
+        .query({ width: 200 });
+
+      expect(response.status).toBe(200);
+      expect(response.headers['content-type']).toMatch(/^image\//);
+    });
+
+    it('should resize uploaded image with width and height', async () => {
+      const testImagePath = path.join(testImageDir, 'test.png');
+      const response = await request(app)
+        .post('/transform-image')
+        .attach('image', testImagePath)
+        .query({ width: 300, height: 200 });
+
+      expect(response.status).toBe(200);
+    });
+
+    it('should convert format', async () => {
+      const testImagePath = path.join(testImageDir, 'test.png');
+      const response = await request(app)
+        .post('/transform-image')
+        .attach('image', testImagePath)
+        .query({ format: 'webp' });
+
+      expect(response.status).toBe(200);
+      expect(response.headers['content-type']).toBe('image/webp');
+    });
+
+    it('should apply quality setting', async () => {
+      const testImagePath = path.join(testImageDir, 'test.png');
+      const response = await request(app)
+        .post('/transform-image')
+        .attach('image', testImagePath)
+        .query({ format: 'jpg', quality: 80 });
+
+      expect(response.status).toBe(200);
+      expect(response.headers['content-type']).toBe('image/jpeg');
+    });
+
+    it('should apply custom transforms', async () => {
+      const testImagePath = path.join(testImageDir, 'test.png');
+      const response = await request(app)
+        .post('/transform-image')
+        .attach('image', testImagePath)
+        .query({ transforms: JSON.stringify([['grayscale']]) });
+
+      expect(response.status).toBe(200);
+    });
+
+    it('should apply multiple transforms', async () => {
+      const testImagePath = path.join(testImageDir, 'test.png');
+      const response = await request(app)
+        .post('/transform-image')
+        .attach('image', testImagePath)
+        .query({
+          transforms: JSON.stringify([
+            ['grayscale'],
+            ['blur', 2],
+            ['sharpen']
+          ])
+        });
+
+      expect(response.status).toBe(200);
+    });
+
+    it('should handle all parameters together', async () => {
+      const testImagePath = path.join(testImageDir, 'test.png');
+      const response = await request(app)
+        .post('/transform-image')
+        .attach('image', testImagePath)
+        .query({
+          width: 400,
+          height: 300,
+          format: 'jpg',
+          quality: 90,
+          fit: 'contain',
+          withoutEnlargement: 'true',
+          transforms: JSON.stringify([['sharpen']])
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.headers['content-type']).toBe('image/jpeg');
+    });
+  });
+
+  describe('Error handling', () => {
+
+    it('should reject invalid format', async () => {
+      const testImagePath = path.join(testImageDir, 'test.png');
+      const response = await request(app)
+        .post('/transform-image')
+        .attach('image', testImagePath)
+        .query({ format: 'invalid' });
+
+      expect(response.status).toBe(400);
+      expect(response.body).toHaveProperty('error');
+    });
+
+    it('should reject invalid width', async () => {
+      const testImagePath = path.join(testImageDir, 'test.png');
+      const response = await request(app)
+        .post('/transform-image')
+        .attach('image', testImagePath)
+        .query({ width: -100 });
+
+      expect(response.status).toBe(400);
+      expect(response.body).toHaveProperty('error');
+    });
+
+    it('should reject invalid quality', async () => {
+      const testImagePath = path.join(testImageDir, 'test.png');
+      const response = await request(app)
+        .post('/transform-image')
+        .attach('image', testImagePath)
+        .query({ quality: 150 });
+
+      expect(response.status).toBe(400);
+      expect(response.body).toHaveProperty('error');
+    });
+
+    it('should reject invalid transforms', async () => {
+      const testImagePath = path.join(testImageDir, 'test.png');
+      const response = await request(app)
+        .post('/transform-image')
+        .attach('image', testImagePath)
+        .query({ transforms: 'not-json' });
+
+      expect(response.status).toBe(400);
+      expect(response.body).toHaveProperty('error');
+    });
+  });
+});

@@ -3,9 +3,26 @@ import fs from "node:fs";
 import path from "node:path";
 import sharp from "sharp";
 import mime from "mime-types";
+import multer from "multer";
 
 const app = express();
 const port = Number(process.env.PORT || 3000);
+
+// Configure multer for file uploads (store in memory)
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 50 * 1024 * 1024 // 50MB max file size
+  },
+  fileFilter: (_req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (INPUT_EXTENSIONS.has(ext)) {
+      cb(null, true);
+    } else {
+      cb(new Error(`Unsupported file type. Allowed: ${Array.from(INPUT_EXTENSIONS).join(", ")}`))
+    }
+  }
+});
 
 // Function to get current image directory (allows runtime changes for testing)
 function getImageDir() {
@@ -138,20 +155,113 @@ function randomItem(list) {
   return list[Math.floor(Math.random() * list.length)];
 }
 
+// Shared function to process image from buffer or file path
+async function processImage(imageInput, query, acceptHeader = "", originalFilename = null) {
+  const width = toPositiveInt(query.width, "width");
+  const height = toPositiveInt(query.height, "height");
+  const quality = toQuality(query.quality);
+  const withoutEnlargement = isTrue(query.withoutEnlargement);
+  const fit = pickFit(query.fit);
+  const outputFormat = query.format ? pickOutputFormat(query.format, acceptHeader) : null;
+  const transforms = parseTransforms(query.transforms);
+
+  // If no transformation parameters are provided, return the original image
+  if (width === undefined && height === undefined && !outputFormat && quality === undefined && !transforms) {
+    let imageBuffer;
+    let mimeType;
+
+    if (Buffer.isBuffer(imageInput)) {
+      // Input is a buffer (from upload)
+      imageBuffer = imageInput;
+      // Get MIME type from original filename if available
+      if (originalFilename) {
+        const ext = path.extname(originalFilename).toLowerCase();
+        mimeType = mime.lookup(ext) || "application/octet-stream";
+      } else {
+        mimeType = "application/octet-stream";
+      }
+    } else {
+      // Input is a file path
+      imageBuffer = fs.readFileSync(imageInput);
+      mimeType = mime.lookup(path.extname(imageInput)) || "application/octet-stream";
+    }
+
+    return { buffer: imageBuffer, mimeType };
+  }
+
+  // Process image with sharp if any transformation is requested
+  let pipeline = sharp(imageInput, { failOn: "none" });
+
+  // Auto-orient based on EXIF data if no custom rotate transform is provided
+  const hasRotateTransform = transforms && transforms.some(t => t[0] === 'rotate');
+  if (!hasRotateTransform) {
+    pipeline = pipeline.rotate();
+  }
+
+  // Only resize if width or height is specified
+  if (width !== undefined || height !== undefined) {
+    pipeline = pipeline.resize({
+      width,
+      height,
+      fit,
+      withoutEnlargement
+    });
+  }
+
+  // Apply custom transforms if provided
+  if (transforms) {
+    pipeline = applyTransforms(pipeline, transforms);
+  }
+
+  // Apply output format if specified
+  const finalFormat = outputFormat || pickOutputFormat("auto", acceptHeader);
+  if (finalFormat === "jpg") {
+    pipeline = pipeline.jpeg(quality !== undefined ? { quality } : {});
+  } else if (finalFormat === "png") {
+    pipeline = pipeline.png(quality !== undefined ? { quality } : {});
+  } else if (finalFormat === "webp") {
+    pipeline = pipeline.webp(quality !== undefined ? { quality } : {});
+  } else if (finalFormat === "tiff") {
+    pipeline = pipeline.tiff(quality !== undefined ? { quality } : {});
+  } else if (finalFormat === "avif") {
+    pipeline = pipeline.avif(quality !== undefined ? { quality } : {});
+  }
+
+  const output = await pipeline.toBuffer();
+  const mimeType = mime.lookup(finalFormat === "jpg" ? "jpeg" : finalFormat) || "application/octet-stream";
+
+  return { buffer: output, mimeType };
+}
+
 app.get("/health", (_req, res) => {
   res.json({ ok: true, imageDir: getImageDir() });
 });
 
+app.post("/transform-image", upload.single("image"), async (req, res) => {
+  try {
+    // Check if file was uploaded
+    if (!req.file) {
+      return res.status(400).json({ error: "No image file uploaded. Use 'image' as the form field name." });
+    }
+
+    // Process the uploaded image buffer
+    const { buffer, mimeType } = await processImage(
+      req.file.buffer,
+      req.query,
+      req.headers.accept || "",
+      req.file.originalname
+    );
+
+    res.setHeader("Content-Type", mimeType);
+    res.setHeader("Cache-Control", "no-store");
+    res.send(buffer);
+  } catch (error) {
+    res.status(400).json({ error: error.message || "Bad request" });
+  }
+});
+
 app.get("/random-image", async (req, res) => {
   try {
-    const width = toPositiveInt(req.query.width, "width");
-    const height = toPositiveInt(req.query.height, "height");
-    const quality = toQuality(req.query.quality);
-    const withoutEnlargement = isTrue(req.query.withoutEnlargement);
-    const fit = pickFit(req.query.fit);
-    const outputFormat = req.query.format ? pickOutputFormat(req.query.format, req.headers.accept || "") : null;
-    const transforms = parseTransforms(req.query.transforms);
-
     const images = collectImages(getImageDir());
     if (images.length === 0) {
       return res.status(404).json({
@@ -161,60 +271,12 @@ app.get("/random-image", async (req, res) => {
 
     const file = randomItem(images);
 
-    // If no transformation parameters are provided, return the original image
-    if (width === undefined && height === undefined && !outputFormat && quality === undefined && !transforms) {
-      const imageBuffer = fs.readFileSync(file);
-      const mimeType = mime.lookup(path.extname(file)) || "application/octet-stream";
-
-      res.setHeader("Content-Type", mimeType);
-      res.setHeader("Cache-Control", "no-store");
-      return res.send(imageBuffer);
-    }
-
-    // Process image with sharp if any transformation is requested
-    let pipeline = sharp(file, { failOn: "none" });
-
-    // Auto-orient based on EXIF data if no custom rotate transform is provided
-    const hasRotateTransform = transforms && transforms.some(t => t[0] === 'rotate');
-    if (!hasRotateTransform) {
-      pipeline = pipeline.rotate();
-    }
-
-    // Only resize if width or height is specified
-    if (width !== undefined || height !== undefined) {
-      pipeline = pipeline.resize({
-        width,
-        height,
-        fit,
-        withoutEnlargement
-      });
-    }
-
-    // Apply custom transforms if provided
-    if (transforms) {
-      pipeline = applyTransforms(pipeline, transforms);
-    }
-
-    // Apply output format if specified
-    const finalFormat = outputFormat || pickOutputFormat("auto", req.headers.accept || "");
-    if (finalFormat === "jpg") {
-      pipeline = pipeline.jpeg(quality !== undefined ? { quality } : {});
-    } else if (finalFormat === "png") {
-      pipeline = pipeline.png(quality !== undefined ? { quality } : {});
-    } else if (finalFormat === "webp") {
-      pipeline = pipeline.webp(quality !== undefined ? { quality } : {});
-    } else if (finalFormat === "tiff") {
-      pipeline = pipeline.tiff(quality !== undefined ? { quality } : {});
-    } else if (finalFormat === "avif") {
-      pipeline = pipeline.avif(quality !== undefined ? { quality } : {});
-    }
-
-    const output = await pipeline.toBuffer();
-    const mimeType = mime.lookup(finalFormat === "jpg" ? "jpeg" : finalFormat) || "application/octet-stream";
+    // Process the randomly selected image file
+    const { buffer, mimeType } = await processImage(file, req.query, req.headers.accept || "");
 
     res.setHeader("Content-Type", mimeType);
     res.setHeader("Cache-Control", "no-store");
-    res.send(output);
+    res.send(buffer);
   } catch (error) {
     res.status(400).json({ error: error.message || "Bad request" });
   }
